@@ -56,15 +56,15 @@ if st.sidebar.checkbox('Experiment Setup', False):
         st.session_state['LabInvest'] = st.slider('Investment into Lab Equipment', 0, Budget, 5000, step=100)
     st.markdown(f'You selected {st.session_state["organism"]} as organism and an investment of {st.session_state["LabInvest"]} {st.session_state["currency"]} into lab equipment. The random seed for the simulation is set to {st.session_state["rand_seed"]}.')
 
-    #################################################
-    # horizontal line
-    st.markdown('---')
-    #################################################
+    # #################################################
+    # # horizontal line
+    # st.markdown('---')
+    # #################################################
 
-    st.subheader('Data management and Analysis')
-    st.markdown('Select the data management system and the analysis software.')
-    DataExportType = st.selectbox('Data Management System', ['Excel', 'Google Sheets', 'LIMS', 'ELN'], index=0)
-    AnalysisSoftware = st.selectbox('Analysis Software', ['Python', 'R', 'Matlab', 'BlueVis'], index=1)
+    # st.subheader('Data management and Analysis')
+    # st.markdown('Select the data management system and the analysis software.')
+    # DataExportType = st.selectbox('Data Management System', ['Excel', 'Google Sheets', 'LIMS', 'ELN'], index=0)
+    # AnalysisSoftware = st.selectbox('Analysis Software', ['Python', 'R', 'Matlab', 'BlueVis'], index=1)
 
     #################################################
     # horizontal line
@@ -108,12 +108,12 @@ if st.sidebar.button('Show Experiment Details'):
 ######################################################
 
 st.sidebar.subheader("Experiment Section")
-Experiment_select = st.sidebar.selectbox('Available Experiments', ['Select', 'Shake Flask', 'Fermentation', 'Promoter Library'], key='1')
+Experiment_select = st.sidebar.selectbox('Available Experiments', ['Select', 'Shake Flask'], key='1')
 if Experiment_select == 'Shake Flask' and st.session_state['exp'] is not None:
     st.title('Shake Flask Experiment')
     st.markdown('For the shake flask experiment, you can set the temperature, shaking speed (rpm), initial optical density (OD600), and glucose concentration in g/L. After setting the parameters, click on "Run Simulation" to start the experiment.')
-    # Display image
-    st.image('Figures/Icons/ShakeFlaskFermentation_SBI.jpg', caption='Shake Flask Experiment', width='stretch')
+    # # Display image
+    # st.image('Figures/Icons/ShakeFlaskFermentation_SBI.jpg', caption='Shake Flask Experiment', width='stretch')
     # Input parameters
     st.subheader('Input Parameters for Shake Flask Experiment')
     col1, col2 = st.columns(2)
@@ -125,7 +125,7 @@ if Experiment_select == 'Shake Flask' and st.session_state['exp'] is not None:
         except ValueError:
             st.error("Please enter only integer values separated by commas.")
         # temp_val = st.number_input(SFlask_VarNames['temp'], min_value=20, max_value=45, value=30)
-        rpm_val = st.number_input(SFlask_VarNames['rpm'], min_value=100, max_value=300, value=200)
+        # rpm_val = st.number_input(SFlask_VarNames['rpm'], min_value=100, max_value=300, value=200)
         od0_val = round(st.number_input(SFlask_VarNames['od0'], min_value=0.0, max_value=0.3, value=0.1), 3)
     with col2:
         # text input to narrow down to specific carbon source
@@ -159,15 +159,15 @@ if Experiment_select == 'Shake Flask' and st.session_state['exp'] is not None:
         sub_mM = round(abs(sub_val * conc_unit_factor),2)
         st.markdown(f'You selected {sub_val} {Conc_Unit} of {sub_sel.name} ({sub_mM} mM).')
 
-        if st.button('Run FBA'):
-            # set uptake rate of selected substrate
-            st.session_state['host'].metabolism.set_resetCarbonExchanges({Exch_Reactions[0].id: sub_mM})  
-            GrowthRate = st.session_state['host'].metabolism.slim_optimize()
-            UpRate = st.session_state['host'].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).lower_bound
-            Vmax = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Vmax
-            Km = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Km
-            st.success(f'FBA with {Exch_Reactions[0].id} and uptake rate of {UpRate} mmol/gCDW/h. Kinetics: {Vmax} mmol/gDW/h and {Km} mM. Growth rate {GrowthRate}/h.')
-            st.write(st.session_state['host'].metabolism.model_tmp.summary())
+        # if st.button('Run FBA'):
+        #     # set uptake rate of selected substrate
+        #     st.session_state['host'].metabolism.set_resetCarbonExchanges({Exch_Reactions[0].id: sub_mM})  
+        #     GrowthRate = st.session_state['host'].metabolism.slim_optimize()
+        #     UpRate = st.session_state['host'].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).lower_bound
+        #     Vmax = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Vmax
+        #     Km = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Km
+        #     st.success(f'FBA with {Exch_Reactions[0].id} and uptake rate of {UpRate} mmol/gCDW/h. Kinetics: {Vmax} mmol/gDW/h and {Km} mM. Growth rate {GrowthRate}/h.')
+        #     st.write(st.session_state['host'].metabolism.model_tmp.summary())
 
 
     if st.button('Run Simulation'):
@@ -178,7 +178,7 @@ if Experiment_select == 'Shake Flask' and st.session_state['exp'] is not None:
         # st.success(f'Simulation started with parameters: {SFlask_VarNames["temp"]}={temp_list}, {SFlask_VarNames["rpm"]}={rpm_val}, {SFlask_VarNames["od0"]}={od0_val}, {SFlask_VarNames["glc"]}={glc_val}')
         with pd.ExcelWriter(FileName, engine='openpyxl') as writer:
             Temp_Data.value.to_excel(writer, sheet_name='TemperatureGrowth', index=False)
-        st.markdown(f'Data saved to {FileName}')
+        # st.markdown(f'Data saved to {FileName}')
         st.download_button(
             label="Download data as Excel",
             data=open(FileName, 'rb').read(),
