@@ -1,0 +1,199 @@
+import os
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+
+import silvio
+from silvio.catalog.StrExpSim import GrowthExperiment
+from silvio.extensions.utils.misc import Download_GSMM
+from silvio.extensions.common import BIGG_dict
+from silvio.utils import coalesce
+
+# read variable names from Variables.py
+from Variables import SFlask_VarNames, Budget
+
+# # Initialize session state variables
+st.session_state['date'] = pd.to_datetime('today').strftime('%y%m%d')
+if 'ExpInit' not in st.session_state:
+    st.session_state['ExpInit'] = None
+# st.session_state['ExpInit'] = False
+if 'exp' not in st.session_state:
+    st.session_state['exp'] = None
+if 'host' not in st.session_state:
+    st.session_state['host'] = None
+if 'currency' not in st.session_state:
+    st.session_state['currency'] = None
+if 'LabInvest' not in st.session_state:
+    st.session_state['LabInvest'] = None
+if 'rand_seed' not in st.session_state:
+    st.session_state['rand_seed'] = None
+if 'organism' not in st.session_state:
+    st.session_state['organism'] = None
+if 'GSMM' not in st.session_state:
+    st.session_state['GSMM'] = None
+
+# ## File locations
+# if 'ModelFile' not in st.session_state:
+#     st.session_state['ModelFile'] = None
+
+# st.title('Experiment Details')
+st.sidebar.title('Experiment Selection')
+
+st.sidebar.subheader('Experiment Setup')
+if st.sidebar.checkbox('Experiment Setup', False):
+    st.title('Setup of Experiment')
+    st.markdown('Select the organism for the experiment and the investment into lab equipment.')
+    col1, col2 = st.columns(2)
+    with col1:
+        st.session_state['organism'] = st.selectbox('Select Organism', ['E.coli-core', 'E.coli', 'S.cerevisiae', 'B.subtilis'], index=0)
+        # numerical input as number_input, with default value of date with six digits, range 0-100000, step 1
+        st.write(f'Default random seed based on date: {st.session_state["date"]}')
+        st.session_state['rand_seed'] = st.number_input('Random Seed for Simulation', min_value=0, max_value=999999, value=int(st.session_state['date']), step=1)
+        # st.session_state['ModelFile'] = f'Data/{BIGG_dict[st.session_state["organism"]]}.json'
+    with col2:
+        st.session_state['currency'] = st.selectbox('Currency', ['EURO', 'Dollar', 'Yuan', 'Rupee', 'Yen'], index=0)
+        st.session_state['LabInvest'] = st.slider('Investment into Lab Equipment', 0, Budget, 5000, step=100)
+    st.markdown(f'You selected {st.session_state["organism"]} as organism and an investment of {st.session_state["LabInvest"]} {st.session_state["currency"]} into lab equipment. The random seed for the simulation is set to {st.session_state["rand_seed"]}.')
+
+    #################################################
+    # horizontal line
+    st.markdown('---')
+    #################################################
+
+    st.subheader('Data management and Analysis')
+    st.markdown('Select the data management system and the analysis software.')
+    DataExportType = st.selectbox('Data Management System', ['Excel', 'Google Sheets', 'LIMS', 'ELN'], index=0)
+    AnalysisSoftware = st.selectbox('Analysis Software', ['Python', 'R', 'Matlab', 'BlueVis'], index=1)
+
+    #################################################
+    # horizontal line
+    st.markdown('---')
+    #################################################
+
+    if st.button('Intialize Experiment'):
+        st.session_state['exp'] = GrowthExperiment(st.session_state['rand_seed'], st.session_state['LabInvest'], Budget)
+        st.session_state['host'] = st.session_state['exp'].create_host(st.session_state['organism'])
+        # st.session_state['GSMM'] = Download_GSMM(st.session_state['organism'])
+
+        st.success('Experiment initialized. You can now run the experiment.')
+        st.session_state['ExpInit'] = True
+
+######################################################
+######################################################
+# Details on experiment
+######################################################
+######################################################
+
+st.sidebar.subheader("Experiment Details")
+if st.sidebar.button('Show Experiment Details'):
+    if st.session_state['exp'] is not None:
+        st.sidebar.markdown(f'Organism: {st.session_state["organism"]}')
+        st.sidebar.markdown(f'Remaining budget: {st.session_state["exp"].budget} {st.session_state["currency"]}')
+        # st.sidebar.markdown(f'Model file: {st.session_state["GSMM"].id}')
+        st.sidebar.markdown(f'Model file: {st.session_state["host"].metabolism.model.id}')
+        # check whether model is functional
+        if st.session_state['host'].metabolism.model.slim_optimize() > 1e-6:
+            st.sidebar.success('Model is functional.')
+        else:
+            st.sidebar.error('Model is not functional.')
+
+    else:
+        st.sidebar.warning('Please initialize the experiment first.')
+
+######################################################
+######################################################
+# Experiment selection
+######################################################
+######################################################
+
+st.sidebar.subheader("Experiment Section")
+Experiment_select = st.sidebar.selectbox('Available Experiments', ['Select', 'Shake Flask', 'Fermentation', 'Promoter Library'], key='1')
+if Experiment_select == 'Shake Flask' and st.session_state['exp'] is not None:
+    st.title('Shake Flask Experiment')
+    st.markdown('For the shake flask experiment, you can set the temperature, shaking speed (rpm), initial optical density (OD600), and glucose concentration in g/L. After setting the parameters, click on "Run Simulation" to start the experiment.')
+    # Display image
+    st.image('Figures/Icons/ShakeFlaskFermentation_SBI.jpg', caption='Shake Flask Experiment', width='stretch')
+    # Input parameters
+    st.subheader('Input Parameters for Shake Flask Experiment')
+    col1, col2 = st.columns(2)
+    with col1:
+        # User input for multiple temperatures (integers)
+        temp_str = st.text_input('Enter temperatures (comma-separated, e.g. 25,30,37)', value='30')
+        try:
+            temp_list = [int(x.strip()) for x in temp_str.split(',') if x.strip()]
+        except ValueError:
+            st.error("Please enter only integer values separated by commas.")
+        # temp_val = st.number_input(SFlask_VarNames['temp'], min_value=20, max_value=45, value=30)
+        rpm_val = st.number_input(SFlask_VarNames['rpm'], min_value=100, max_value=300, value=200)
+        od0_val = round(st.number_input(SFlask_VarNames['od0'], min_value=0.0, max_value=0.3, value=0.1), 3)
+    with col2:
+        # text input to narrow down to specific carbon source
+        Substrate_Filter = st.text_input('Filter Carbon Source (e.g. glc, lac, ace, glucose, Glucose etc)', value='glc')
+        model = st.session_state['host'].metabolism.model
+        if Substrate_Filter:
+            Fil1 = set(model.metabolites.query(Substrate_Filter, attribute='name'))
+            Fil2 = set(model.metabolites.query(Substrate_Filter, attribute='id'))
+            Fil2_unique = Fil2 - Fil1
+            Carbon_Substrates =  list(Fil1) + list(Fil2_unique)
+            # coalesce(st.session_state['GSMM'].metabolites.query(Substrate_Filter[1:], attribute='name') + st.session_state['GSMM'].metabolites.query(Substrate_Filter[1:], attribute='id'))
+            sub_sel = st.selectbox('Select Carbon Source', Carbon_Substrates, index=0)
+            # find sustrate in exchange reactions
+            Exch_Reactions = [r for r in model.exchanges if sub_sel.id in r.reaction]
+            if not Exch_Reactions:
+                st.warning(f'No exchange reaction found for "{sub_sel}". Please select another substrate.')
+            else:
+                st.markdown(f'Found exchange reaction "{Exch_Reactions[0].id}"')
+        # selectbox for concentration unit, default g/L, options: g/L, mM, M
+        # the number input for concentration is only shown if the concentration unit is selected
+        Conc_Unit = st.selectbox('Select Concentration Unit', ['g/L', 'mM', 'M'], index=0)
+        if Conc_Unit == 'g/L':
+            conc_unit_factor = 1/(sub_sel.formula_weight/1000)  # convert g/L to mmol/L
+        elif Conc_Unit == 'mM':
+            conc_unit_factor = 1 
+        elif Conc_Unit == 'M':
+            conc_unit_factor = 1/1000  # convert M to mmol/L
+        else:
+            conc_unit_factor = 1  # default to g/L if something goes wrong
+        sub_val = round(st.number_input(f'Concentration ({Conc_Unit})', min_value=0., max_value=50., value=1., step=.1),2)
+        sub_mM = round(abs(sub_val * conc_unit_factor),2)
+        st.markdown(f'You selected {sub_val} {Conc_Unit} of {sub_sel.name} ({sub_mM} mM).')
+
+        if st.button('Run FBA'):
+            # set uptake rate of selected substrate
+            st.session_state['host'].metabolism.set_resetCarbonExchanges({Exch_Reactions[0].id: sub_mM})  
+            GrowthRate = st.session_state['host'].metabolism.slim_optimize()
+            UpRate = st.session_state['host'].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).lower_bound
+            Vmax = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Vmax
+            Km = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Km
+            st.success(f'FBA with {Exch_Reactions[0].id} and uptake rate of {UpRate} mmol/gCDW/h. Kinetics: {Vmax} mmol/gDW/h and {Km} mM. Growth rate {GrowthRate}/h.')
+            st.write(st.session_state['host'].metabolism.model_tmp.summary())
+
+
+    if st.button('Run Simulation'):
+        # format Temp_Data as xlsx for download
+        FileName = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_ODInit{str(od0_val).replace(".","-")}_ShakeFlask.xlsx'
+        # run simulation
+        Temp_Data = st.session_state['exp'].measure_TemperatureGrowth(st.session_state['organism'], temp_list, od0_val)
+        # st.success(f'Simulation started with parameters: {SFlask_VarNames["temp"]}={temp_list}, {SFlask_VarNames["rpm"]}={rpm_val}, {SFlask_VarNames["od0"]}={od0_val}, {SFlask_VarNames["glc"]}={glc_val}')
+        with pd.ExcelWriter(FileName, engine='openpyxl') as writer:
+            Temp_Data.value.to_excel(writer, sheet_name='TemperatureGrowth', index=False)
+        st.markdown(f'Data saved to {FileName}')
+        st.download_button(
+            label="Download data as Excel",
+            data=open(FileName, 'rb').read(),
+            file_name=os.path.split(FileName)[-1],
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        st.success('Data simulation completed and file is ready for download.')
+else:
+    if st.session_state['exp'] is None:
+        st.warning('Please initialize the experiment first.')
+    else:
+        st.info('Select "Shake Flask" from the dropdown to set parameters and run the simulation.')
+
+st.sidebar.subheader("Reset Experiment")
+if st.sidebar.button('Reset Experiment'):
+    st.session_state['ExpInit'] = None
+    st.session_state['exp'] = None
+    st.sidebar.success('Experiment reset. You can set up a new experiment now.')

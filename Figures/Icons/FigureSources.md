@@ -1,0 +1,1 @@
+[ShakeFlaskFermentation_SBI.jpg](https://www.scientificbio.com/microbial-screening-in-shake-flasks)
