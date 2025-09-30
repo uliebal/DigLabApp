@@ -110,6 +110,9 @@ if st.sidebar.toggle('Show Experiment Details'):
             if st.session_state['exp'].experiment_history:
                 st.markdown('### Previous Experiments:')
                 st.write({st.session_state['exp'].experiment_history[exp].ExperimentID for exp in st.session_state['exp'].experiment_history})
+            st.markdown('---')
+            rnd = st.session_state['host'].make_generator()
+            st.markdown({rnd.pick_uniform(0,1)})
     else:
         st.warning('Please initialize the experiment first.')
 
@@ -123,6 +126,8 @@ st.sidebar.subheader("Experiment Section")
 Experiment_select = st.sidebar.selectbox('Fermentation Type', ['Select', 'Batch', 'Continuous'], key='1')
 if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
     myExp = ExperimentSettings()
+    myExp.ExperimentType = 'Batch'
+    myExp.HostName = st.session_state['organism']
     st.title('Batch Experiment in Shake Flask')
     st.markdown('For the shake flask experiment, you can set the temperature, shaking speed (rpm), initial optical density (OD600), and glucose concentration in g/L. After setting the parameters, click on "Run Simulation" to start the experiment.')
     # Display image
@@ -144,6 +149,7 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         myExp.CultivationTime = st.slider('Total Cultivation Time (h)', min_value =1, max_value=48, value=24, step=1)
         # sampling interval in hours
         myExp.SamplingInterval = st.slider('Sampling Interval (h)', min_value=.5, max_value=12.0, value=1.0, step=0.5)
+        myExp.set_SamplingVector()
 
     with col2:
         # text input to narrow down to specific carbon source
@@ -179,21 +185,21 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         myExp.CarbonConc = round(abs(sub_val * conc_unit_factor),2)
         st.markdown(f'You selected {myExp.CarbonName} with {myExp.CarbonConc} mM.')
 
-        if st.button('Run FBA'):
-            # set uptake rate of selected substrate
-            st.session_state['host'].metabolism.set_resetCarbonExchanges({myExp.CarbonID: myExp.CarbonConc})
-            GrowthRate = st.session_state['host'].metabolism.slim_optimize()
-            ExchangeRates = st.session_state['host'].metabolism.optimize_ReportExchanges()
-            UpRate = -ExchangeRates[myExp.CarbonID]
-            Yield = round(GrowthRate/UpRate,2) if UpRate != 0 else 0 # gCDW/mmol
-            # calculate biomass capacity in gCDW/L
-            BioWeightConc = Yield * myExp.CarbonConc  # gCDW/L
-            CapacityWeight = BioWeightConc * (myExp.MediumVolume/1000)  # gCDW in the flask
-            CapacityOD = CapacityWeight / st.session_state['host'].growth.OD2X  # convert gCDW to OD600
-            Vmax = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Vmax
-            Km = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Km
-            st.success(f'FBA with {Exch_Reactions[0].id} and uptake rate of {UpRate} mmol/gCDW/h. Kinetics: {Vmax} mmol/gDW/h and {Km} mM. Growth rate {GrowthRate}/h.\n\n Yield: {Yield} gCDW/mmol ({round(Yield*1000/sub_sel.formula_weight,2)} gCDW/gSubstrate) substrate.\n\n Biomass capacity in flask: {round(CapacityOD,2)} OD600).')
-            st.write(st.session_state['host'].metabolism.model_tmp.summary())
+        # if st.button('Run FBA'):
+        #     # set uptake rate of selected substrate
+        #     st.session_state['host'].metabolism.set_resetCarbonExchanges({myExp.CarbonID: myExp.CarbonConc})
+        #     GrowthRate = st.session_state['host'].metabolism.slim_optimize()
+        #     ExchangeRates = st.session_state['host'].metabolism.optimize_ReportExchanges()
+        #     UpRate = -ExchangeRates[myExp.CarbonID]
+        #     Yield = round(GrowthRate/UpRate,2) if UpRate != 0 else 0 # gCDW/mmol
+        #     # calculate biomass capacity in gCDW/L
+        #     BioWeightConc = Yield * myExp.CarbonConc  # gCDW/L
+        #     CapacityWeight = BioWeightConc * (myExp.MediumVolume/1000)  # gCDW in the flask
+        #     CapacityOD = CapacityWeight / st.session_state['host'].growth.OD2X  # convert gCDW to OD600
+        #     Vmax = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Vmax
+        #     Km = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Km
+        #     st.success(f'FBA with {Exch_Reactions[0].id} and uptake rate of {UpRate} mmol/gCDW/h. Kinetics: {Vmax} mmol/gDW/h and {Km} mM. Growth rate {GrowthRate}/h.\n\n Yield: {Yield} gCDW/mmol ({round(Yield*1000/sub_sel.formula_weight,2)} gCDW/gSubstrate) substrate.\n\n Biomass capacity in flask: {round(CapacityOD,2)} OD600).')
+        #     st.write(st.session_state['host'].metabolism.model_tmp.summary())
 
     # text input for experiment id
     myExp.ExperimentID = st.text_input('Experiment ID', value=f'Batch_v1')
@@ -201,8 +207,7 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
     if st.button('Run Simulation'):
         # set uptake rate of selected substrate
         st.session_state['host'].metabolism.set_resetCarbonExchanges({myExp.CarbonID: myExp.CarbonConc})
-        GrowthRate = st.session_state['host'].metabolism.slim_optimize()
-        ExchangeRates = st.session_state['host'].metabolism.optimize_ReportExchanges()
+        GrowthRate, ExchangeRates = st.session_state['host'].metabolism.optimize_ReportExchanges()
         UpRate = -ExchangeRates[myExp.CarbonID]
         Yield = round(GrowthRate/UpRate,2) if UpRate != 0 else 0 # gCDW/mmol
         # calculate biomass capacity in gCDW/L
@@ -213,7 +218,7 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         # format Data as xlsx for download
         myExp.Results = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_ODInit{str(myExp.InitBiomass).replace(".","-")}_ShakeFlask.xlsx'
         # run simulation
-        Data = st.session_state['exp'].measure_TemperatureGrowth(host_name=st.session_state['organism'], Temperatures=myExp.Temperature, InitBio=myExp.InitBiomass, GrowthRate=GrowthRate, Capacity=CapacityOD)
+        Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test=True)
         with pd.ExcelWriter(myExp.Results, engine='openpyxl') as writer:
             Data.value.to_excel(writer, sheet_name='TemperatureGrowth', index=False)
         st.markdown(f'Data saved to {myExp.Results}')
