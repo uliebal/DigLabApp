@@ -7,6 +7,7 @@ import plotly.express as px
 import silvio
 from silvio.catalog.StrExpSim import DigLabSim
 from silvio.experiment import ExperimentSettings
+from silvio.extensions.common import myUnits, AnalyticsCosts
 # from silvio.extensions.utils.misc import Download_GSMM
 # from silvio.extensions.common import BIGG_dict
 # from silvio.utils import coalesce
@@ -14,7 +15,7 @@ from silvio.experiment import ExperimentSettings
 from silvio import __version__ as silvio_version
 
 # read variable names from Variables.py
-from Variables import SFlask_VarNames, Budget
+from Variables import Budget
 
 # # Initialize session state variables
 st.session_state['date'] = pd.to_datetime('today').strftime('%y%m%d')
@@ -82,39 +83,50 @@ if st.sidebar.toggle('Experiment Setup'):
         st.success('Experiment initialized. You can now run the experiment.')
         st.session_state['ExpInit'] = True
 
+
+
 ######################################################
 ######################################################
 # Details on experiment
 ######################################################
 ######################################################
 
-st.sidebar.subheader("Experiment Details")
-if st.sidebar.toggle('Show Experiment Details'):
-    if st.session_state['exp'] is not None:
+# st.sidebar.subheader("Experiment Details")
+# if st.sidebar.toggle('Show Experiment Details'):
         # information box on the main page on the experiment details
-        with st.expander('Experiment Details', expanded=True):
-            st.markdown(f'Organism: {st.session_state["organism"]}')
-            st.markdown(f'Remaining budget: {st.session_state["exp"].budget} {st.session_state["currency"]}')
-            # st.sidebar.markdown(f'Model file: {st.session_state["GSMM"].id}')
-            st.markdown(f'Model file: {st.session_state["host"].metabolism.model.id}')
-            # check whether model is functional
-            if st.session_state['host'].metabolism.model.slim_optimize() > 1e-6:
-                st.success('Model is functional.')
-            else:
-                st.error('Model is not functional.')
-            st.markdown(f'Optimal Temperature: {st.session_state["host"].opt_growth_temp} °C')
-            st.markdown(f'OD2X: {st.session_state["host"].growth.OD2X} gCDW/OD600')
-            st.markdown(f'Silvio version: {silvio_version}')
-            st.markdown(f'Experiment history: {len(st.session_state["exp"].experiment_history)} experiments recorded.')
-            # if there are any experiments in the history, display them
-            if st.session_state['exp'].experiment_history:
-                st.markdown('### Previous Experiments:')
-                st.write({st.session_state['exp'].experiment_history[exp].ExperimentID for exp in st.session_state['exp'].experiment_history})
-            st.markdown('---')
-            rnd = st.session_state['host'].make_generator()
-            st.markdown({rnd.pick_uniform(0,1)})
-    else:
-        st.warning('Please initialize the experiment first.')
+with st.expander('Experiment Details', expanded=True):
+    if st.session_state['exp'] is not None:
+        st.markdown(f'Organism: {st.session_state["organism"]}')
+        st.markdown(f'Remaining budget: {st.session_state["exp"].budget} {st.session_state["currency"]}')
+        # st.sidebar.markdown(f'Model file: {st.session_state["GSMM"].id}')
+        st.markdown(f'Model file: {st.session_state["host"].metabolism.model.id}')
+        # check whether model is functional
+        if st.session_state['host'].metabolism.model.slim_optimize() > 1e-6:
+            st.success('Model is functional.')
+        else:
+            st.error('Model is not functional.')
+        st.markdown(f'Optimal Temperature: {st.session_state["host"].opt_growth_temp} °C')
+        st.markdown(f'OD2X: {st.session_state["host"].growth.OD2X} gCDW/OD600')
+        st.markdown(f'Silvio version: {silvio_version}')
+        # st.markdown(f'Experiment history: {len(st.session_state["exp"].experiment_history)} experiments recorded.')
+        option = st.selectbox('Select Experiment to View Details', st.session_state['exp'].experiment_history.keys(), index=None, placeholder='Select Experiment...')
+        # display details of selected experiment by looping over the attributes of the ExperimentSettings object
+        # only display attributes that are not None
+        if option:
+            for attr, value in vars(st.session_state['exp'].experiment_history[option]).items():
+                if attr not in []:#'CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','Results']:  # skip some attributes
+                    st.markdown(f'**{attr}**: {value} {myUnits[attr] if attr in myUnits else ""}')
+                # allow downloading the results file
+                if attr == 'Results' and value is not None:
+                    st.download_button(
+                        label="Download Results File",
+                        data=open(value, 'rb').read(),
+                        file_name=os.path.split(value)[-1],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+            # alternatively,
+        else:
+            st.info('Select an experiment from the dropdown to view details.')
 
 ######################################################
 ######################################################
@@ -143,12 +155,13 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         except ValueError:
             st.error("Please enter only integer values separated by commas.")
         # rpm_val = st.number_input(SFlask_VarNames['rpm'], min_value=100, max_value=300, value=200)
-        myExp.InitBiomass = round(st.number_input(SFlask_VarNames['od0'], min_value=0.0, max_value=0.3, value=0.1), 3)        
+        myExp.InitBiomass = round(st.number_input('Optical density, OD600', min_value=0.0, max_value=0.3, value=0.1), 3) * st.session_state['host'].growth.OD2X  # convert OD600 to gCDW/L       
         myExp.MediumVolume = st.slider('Culture Volume (mL) of 500 ml max', min_value=10, max_value=500, value=100, step=10)
         # total cultivation time in hours
         myExp.CultivationTime = st.slider('Total Cultivation Time (h)', min_value =1, max_value=48, value=24, step=1)
         # sampling interval in hours
         myExp.SamplingInterval = st.slider('Sampling Interval (h)', min_value=.5, max_value=12.0, value=1.0, step=0.5)
+        myExp.Analytics = st.multiselect('Select Analytics, multiple possible', list(AnalyticsCosts.keys()), default=[list(AnalyticsCosts.keys())[0]])
         myExp.set_SamplingVector()
 
     with col2:
@@ -206,19 +219,19 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
 
     if st.button('Run Simulation'):
         # set uptake rate of selected substrate
-        st.session_state['host'].metabolism.set_resetCarbonExchanges({myExp.CarbonID: myExp.CarbonConc})
-        GrowthRate, ExchangeRates = st.session_state['host'].metabolism.optimize_ReportExchanges()
-        UpRate = -ExchangeRates[myExp.CarbonID]
-        Yield = round(GrowthRate/UpRate,2) if UpRate != 0 else 0 # gCDW/mmol
-        # calculate biomass capacity in gCDW/L
-        BioWeightConc = Yield * myExp.CarbonConc  # gCDW/L
-        CapacityWeight = BioWeightConc * (myExp.MediumVolume/1000)  # gCDW in the flask
-        CapacityOD = CapacityWeight / st.session_state['host'].growth.OD2X  # convert gCDW to OD600
+        # st.session_state['host'].metabolism.set_resetCarbonExchanges({myExp.CarbonID: myExp.CarbonConc})
+        # GrowthRate, ExchangeRates = st.session_state['host'].metabolism.optimize_ReportExchanges()
+        # UpRate = -ExchangeRates[myExp.CarbonID]
+        # Yield = round(GrowthRate/UpRate,2) if UpRate != 0 else 0 # gCDW/mmol
+        # # calculate biomass capacity in gCDW/L
+        # BioWeightConc = Yield * myExp.CarbonConc  # gCDW/L
+        # CapacityWeight = BioWeightConc * (myExp.MediumVolume/1000)  # gCDW in the flask
+        # CapacityOD = CapacityWeight / st.session_state['host'].growth.OD2X  # convert gCDW to OD600
 
         # format Data as xlsx for download
-        myExp.Results = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_ODInit{str(myExp.InitBiomass).replace(".","-")}_ShakeFlask.xlsx'
+        myExp.Results = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_{myExp.ExperimentID}.xlsx'
         # run simulation
-        Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test=True)
+        Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test=False)
         with pd.ExcelWriter(myExp.Results, engine='openpyxl') as writer:
             Data.value.to_excel(writer, sheet_name='TemperatureGrowth', index=False)
         st.markdown(f'Data saved to {myExp.Results}')
