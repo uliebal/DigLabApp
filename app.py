@@ -60,20 +60,20 @@ if st.sidebar.toggle('Experiment Setup'):
         st.session_state['LabInvest'] = st.slider('Investment into Lab Equipment', 0, Budget, 5000, step=100)
     st.markdown(f'You selected {st.session_state["organism"]} as organism and an investment of {st.session_state["LabInvest"]} {st.session_state["currency"]} into lab equipment. The random seed for the simulation is set to {st.session_state["rand_seed"]}.')
 
-    #################################################
-    # horizontal line
-    st.markdown('---')
-    #################################################
+    # #################################################
+    # # horizontal line
+    # st.markdown('---')
+    # #################################################
 
-    st.subheader('Data management and Analysis')
-    st.markdown('Select the data management system and the analysis software.')
-    DataExportType = st.selectbox('Data Management System', ['Excel', 'Google Sheets', 'LIMS', 'ELN'], index=0)
-    AnalysisSoftware = st.selectbox('Analysis Software', ['Python', 'R', 'Matlab', 'BlueVis'], index=1)
+    # st.subheader('Data management and Analysis')
+    # st.markdown('Select the data management system and the analysis software.')
+    # DataExportType = st.selectbox('Data Management System', ['Excel', 'Google Sheets', 'LIMS', 'ELN'], index=0)
+    # AnalysisSoftware = st.selectbox('Analysis Software', ['Python', 'R', 'Matlab', 'BlueVis'], index=1)
 
-    #################################################
-    # horizontal line
-    st.markdown('---')
-    #################################################
+    # #################################################
+    # # horizontal line
+    # st.markdown('---')
+    # #################################################
 
     if st.button('Intialize Experiment'):
         st.session_state['exp'] = DigLabSim(st.session_state['rand_seed'], st.session_state['LabInvest'], Budget)
@@ -105,8 +105,8 @@ with st.expander('Experiment Details', expanded=True):
             st.success('Model is functional.')
         else:
             st.error('Model is not functional.')
-        st.markdown(f'Optimal Temperature: {st.session_state["host"].opt_growth_temp} °C')
-        st.markdown(f'OD2X: {st.session_state["host"].growth.OD2X} gCDW/OD600')
+        # st.markdown(f'Optimal Temperature: {st.session_state["host"].opt_growth_temp} °C')
+        # st.markdown(f'OD2X: {st.session_state["host"].growth.OD2X} gCDW/OD600')
         st.markdown(f'Silvio version: {silvio_version}')
         # st.markdown(f'Experiment history: {len(st.session_state["exp"].experiment_history)} experiments recorded.')
         option = st.selectbox('Select Experiment to View Details', st.session_state['exp'].experiment_history.keys(), index=None, placeholder='Select Experiment...')
@@ -114,7 +114,7 @@ with st.expander('Experiment Details', expanded=True):
         # only display attributes that are not None
         if option:
             for attr, value in vars(st.session_state['exp'].experiment_history[option]).items():
-                if attr not in []:#'CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','Results']:  # skip some attributes
+                if attr not in ['CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','Results']:#'CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','Results']:  # skip some attributes
                     st.markdown(f'**{attr}**: {value} {myUnits[attr] if attr in myUnits else ""}')
                 # allow downloading the results file
                 if attr == 'Results' and value is not None:
@@ -135,15 +135,15 @@ with st.expander('Experiment Details', expanded=True):
 ######################################################
 
 st.sidebar.subheader("Experiment Section")
-Experiment_select = st.sidebar.selectbox('Fermentation Type', ['Select', 'Batch', 'Continuous'], key='1')
+Experiment_select = st.sidebar.selectbox('Fermentation Type', ['Select', 'Batch'], key='1') #, 'Continuous'
 if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
     myExp = ExperimentSettings()
     myExp.ExperimentType = 'Batch'
     myExp.HostName = st.session_state['organism']
     st.title('Batch Experiment in Shake Flask')
     st.markdown('For the shake flask experiment, you can set the temperature, shaking speed (rpm), initial optical density (OD600), and glucose concentration in g/L. After setting the parameters, click on "Run Simulation" to start the experiment.')
-    # Display image
-    st.image('Figures/Icons/ShakeFlaskFermentation_SBI.jpg', caption='Shake Flask Experiment', width='stretch')
+    # # Display image
+    # st.image('Figures/Icons/ShakeFlaskFermentation_SBI.jpg', caption='Shake Flask Experiment', width='stretch')
     # Input parameters
     st.subheader('Input parameters for batch shake flask experiment')
     col1, col2 = st.columns(2)
