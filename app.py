@@ -5,13 +5,17 @@ import numpy as np
 import plotly.express as px
 
 import silvio
-from silvio.catalog.StrExpSim import GrowthExperiment
-from silvio.extensions.utils.misc import Download_GSMM
-from silvio.extensions.common import BIGG_dict
-from silvio.utils import coalesce
+from silvio.catalog.StrExpSim import DigLabSim
+from silvio.experiment import ExperimentSettings
+from silvio.extensions.common import myUnits, AnalyticsCosts
+# from silvio.extensions.utils.misc import Download_GSMM
+# from silvio.extensions.common import BIGG_dict
+# from silvio.utils import coalesce
+# get silvio version
+from silvio import __version__ as silvio_version
 
 # read variable names from Variables.py
-from Variables import SFlask_VarNames, Budget
+from Variables import Budget
 
 # # Initialize session state variables
 st.session_state['date'] = pd.to_datetime('today').strftime('%y%m%d')
@@ -41,7 +45,7 @@ if 'GSMM' not in st.session_state:
 st.sidebar.title('Experiment Selection')
 
 st.sidebar.subheader('Experiment Setup')
-if st.sidebar.checkbox('Experiment Setup', False):
+if st.sidebar.toggle('Experiment Setup'):
     st.title('Setup of Experiment')
     st.markdown('Select the organism for the experiment and the investment into lab equipment.')
     col1, col2 = st.columns(2)
@@ -66,18 +70,20 @@ if st.sidebar.checkbox('Experiment Setup', False):
     # DataExportType = st.selectbox('Data Management System', ['Excel', 'Google Sheets', 'LIMS', 'ELN'], index=0)
     # AnalysisSoftware = st.selectbox('Analysis Software', ['Python', 'R', 'Matlab', 'BlueVis'], index=1)
 
-    #################################################
-    # horizontal line
-    st.markdown('---')
-    #################################################
+    # #################################################
+    # # horizontal line
+    # st.markdown('---')
+    # #################################################
 
     if st.button('Intialize Experiment'):
-        st.session_state['exp'] = GrowthExperiment(st.session_state['rand_seed'], st.session_state['LabInvest'], Budget)
+        st.session_state['exp'] = DigLabSim(st.session_state['rand_seed'], st.session_state['LabInvest'], Budget)
         st.session_state['host'] = st.session_state['exp'].create_host(st.session_state['organism'])
         # st.session_state['GSMM'] = Download_GSMM(st.session_state['organism'])
 
         st.success('Experiment initialized. You can now run the experiment.')
         st.session_state['ExpInit'] = True
+
+
 
 ######################################################
 ######################################################
@@ -85,21 +91,42 @@ if st.sidebar.checkbox('Experiment Setup', False):
 ######################################################
 ######################################################
 
-st.sidebar.subheader("Experiment Details")
-if st.sidebar.button('Show Experiment Details'):
+# st.sidebar.subheader("Experiment Details")
+# if st.sidebar.toggle('Show Experiment Details'):
+        # information box on the main page on the experiment details
+with st.expander('Experiment Details', expanded=True):
     if st.session_state['exp'] is not None:
-        st.sidebar.markdown(f'Organism: {st.session_state["organism"]}')
-        st.sidebar.markdown(f'Remaining budget: {st.session_state["exp"].budget} {st.session_state["currency"]}')
+        st.markdown(f'Organism: {st.session_state["organism"]}')
+        st.markdown(f'Remaining budget: {st.session_state["exp"].budget} {st.session_state["currency"]}')
         # st.sidebar.markdown(f'Model file: {st.session_state["GSMM"].id}')
-        st.sidebar.markdown(f'Model file: {st.session_state["host"].metabolism.model.id}')
+        st.markdown(f'Model file: {st.session_state["host"].metabolism.model.id}')
         # check whether model is functional
         if st.session_state['host'].metabolism.model.slim_optimize() > 1e-6:
-            st.sidebar.success('Model is functional.')
+            st.success('Model is functional.')
         else:
-            st.sidebar.error('Model is not functional.')
-
-    else:
-        st.sidebar.warning('Please initialize the experiment first.')
+            st.error('Model is not functional.')
+        # st.markdown(f'Optimal Temperature: {st.session_state["host"].opt_growth_temp} °C')
+        # st.markdown(f'OD2X: {st.session_state["host"].growth.OD2X} gCDW/OD600')
+        st.markdown(f'Silvio version: {silvio_version}')
+        # st.markdown(f'Experiment history: {len(st.session_state["exp"].experiment_history)} experiments recorded.')
+        option = st.selectbox('Select Experiment to View Details', st.session_state['exp'].experiment_history.keys(), index=None, placeholder='Select Experiment...')
+        # display details of selected experiment by looping over the attributes of the ExperimentSettings object
+        # only display attributes that are not None
+        if option:
+            for attr, value in vars(st.session_state['exp'].experiment_history[option]).items():
+                if attr not in ['CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','Results']:#'CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','Results']:  # skip some attributes
+                    st.markdown(f'**{attr}**: {value} {myUnits[attr] if attr in myUnits else ""}')
+                # allow downloading the results file
+                if attr == 'Results' and value is not None:
+                    st.download_button(
+                        label="Download Results File",
+                        data=open(value, 'rb').read(),
+                        file_name=os.path.split(value)[-1],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+            # alternatively,
+        else:
+            st.info('Select an experiment from the dropdown to view details.')
 
 ######################################################
 ######################################################
@@ -108,25 +135,35 @@ if st.sidebar.button('Show Experiment Details'):
 ######################################################
 
 st.sidebar.subheader("Experiment Section")
-Experiment_select = st.sidebar.selectbox('Available Experiments', ['Select', 'Shake Flask'], key='1')
-if Experiment_select == 'Shake Flask' and st.session_state['exp'] is not None:
-    st.title('Shake Flask Experiment')
+Experiment_select = st.sidebar.selectbox('Fermentation Type', ['Select', 'Batch'], key='1') #, 'Continuous'
+if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
+    myExp = ExperimentSettings()
+    myExp.ExperimentType = 'Batch'
+    myExp.HostName = st.session_state['organism']
+    st.title('Batch Experiment in Shake Flask')
     st.markdown('For the shake flask experiment, you can set the temperature, shaking speed (rpm), initial optical density (OD600), and glucose concentration in g/L. After setting the parameters, click on "Run Simulation" to start the experiment.')
     # # Display image
     # st.image('Figures/Icons/ShakeFlaskFermentation_SBI.jpg', caption='Shake Flask Experiment', width='stretch')
     # Input parameters
-    st.subheader('Input Parameters for Shake Flask Experiment')
+    st.subheader('Input parameters for batch shake flask experiment')
     col1, col2 = st.columns(2)
     with col1:
         # User input for multiple temperatures (integers)
         temp_str = st.text_input('Enter temperatures (comma-separated, e.g. 25,30,37)', value='30')
         try:
-            temp_list = [int(x.strip()) for x in temp_str.split(',') if x.strip()]
+            myExp.Temperature = [int(x.strip()) for x in temp_str.split(',') if x.strip()]
         except ValueError:
             st.error("Please enter only integer values separated by commas.")
-        # temp_val = st.number_input(SFlask_VarNames['temp'], min_value=20, max_value=45, value=30)
         # rpm_val = st.number_input(SFlask_VarNames['rpm'], min_value=100, max_value=300, value=200)
-        od0_val = round(st.number_input(SFlask_VarNames['od0'], min_value=0.0, max_value=0.3, value=0.1), 3)
+        myExp.InitBiomass = round(st.number_input('Optical density, OD600', min_value=0.0, max_value=0.3, value=0.1), 3) * st.session_state['host'].growth.OD2X  # convert OD600 to gCDW/L       
+        myExp.MediumVolume = st.slider('Culture Volume (mL) of 500 ml max', min_value=10, max_value=500, value=100, step=10)
+        # total cultivation time in hours
+        myExp.CultivationTime = st.slider('Total Cultivation Time (h)', min_value =1, max_value=48, value=24, step=1)
+        # sampling interval in hours
+        myExp.SamplingInterval = st.slider('Sampling Interval (h)', min_value=.5, max_value=12.0, value=1.0, step=0.5)
+        myExp.Analytics = st.multiselect('Select Analytics, multiple possible', list(AnalyticsCosts.keys()), default=[list(AnalyticsCosts.keys())[0]])
+        myExp.set_SamplingVector()
+
     with col2:
         # text input to narrow down to specific carbon source
         Substrate_Filter = st.text_input('Filter Carbon Source (e.g. glc, lac, ace, glucose, Glucose etc)', value='glc')
@@ -143,7 +180,9 @@ if Experiment_select == 'Shake Flask' and st.session_state['exp'] is not None:
             if not Exch_Reactions:
                 st.warning(f'No exchange reaction found for "{sub_sel}". Please select another substrate.')
             else:
-                st.markdown(f'Found exchange reaction "{Exch_Reactions[0].id}"')
+                myExp.CarbonID = Exch_Reactions[0].id
+                myExp.CarbonName = sub_sel.name
+                st.markdown(f'Found exchange reaction "{myExp.CarbonID}"')
         # selectbox for concentration unit, default g/L, options: g/L, mM, M
         # the number input for concentration is only shown if the concentration unit is selected
         Conc_Unit = st.selectbox('Select Concentration Unit', ['g/L', 'mM', 'M'], index=0)
@@ -156,35 +195,53 @@ if Experiment_select == 'Shake Flask' and st.session_state['exp'] is not None:
         else:
             conc_unit_factor = 1  # default to g/L if something goes wrong
         sub_val = round(st.number_input(f'Concentration ({Conc_Unit})', min_value=0., max_value=50., value=1., step=.1),2)
-        sub_mM = round(abs(sub_val * conc_unit_factor),2)
-        st.markdown(f'You selected {sub_val} {Conc_Unit} of {sub_sel.name} ({sub_mM} mM).')
+        myExp.CarbonConc = round(abs(sub_val * conc_unit_factor),2)
+        st.markdown(f'You selected {myExp.CarbonName} with {myExp.CarbonConc} mM.')
 
         # if st.button('Run FBA'):
         #     # set uptake rate of selected substrate
-        #     st.session_state['host'].metabolism.set_resetCarbonExchanges({Exch_Reactions[0].id: sub_mM})  
+        #     st.session_state['host'].metabolism.set_resetCarbonExchanges({myExp.CarbonID: myExp.CarbonConc})
         #     GrowthRate = st.session_state['host'].metabolism.slim_optimize()
-        #     UpRate = st.session_state['host'].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).lower_bound
+        #     ExchangeRates = st.session_state['host'].metabolism.optimize_ReportExchanges()
+        #     UpRate = -ExchangeRates[myExp.CarbonID]
+        #     Yield = round(GrowthRate/UpRate,2) if UpRate != 0 else 0 # gCDW/mmol
+        #     # calculate biomass capacity in gCDW/L
+        #     BioWeightConc = Yield * myExp.CarbonConc  # gCDW/L
+        #     CapacityWeight = BioWeightConc * (myExp.MediumVolume/1000)  # gCDW in the flask
+        #     CapacityOD = CapacityWeight / st.session_state['host'].growth.OD2X  # convert gCDW to OD600
         #     Vmax = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Vmax
         #     Km = st.session_state["host"].metabolism.model_tmp.reactions.get_by_id(Exch_Reactions[0].id).Km
-        #     st.success(f'FBA with {Exch_Reactions[0].id} and uptake rate of {UpRate} mmol/gCDW/h. Kinetics: {Vmax} mmol/gDW/h and {Km} mM. Growth rate {GrowthRate}/h.')
+        #     st.success(f'FBA with {Exch_Reactions[0].id} and uptake rate of {UpRate} mmol/gCDW/h. Kinetics: {Vmax} mmol/gDW/h and {Km} mM. Growth rate {GrowthRate}/h.\n\n Yield: {Yield} gCDW/mmol ({round(Yield*1000/sub_sel.formula_weight,2)} gCDW/gSubstrate) substrate.\n\n Biomass capacity in flask: {round(CapacityOD,2)} OD600).')
         #     st.write(st.session_state['host'].metabolism.model_tmp.summary())
 
+    # text input for experiment id
+    myExp.ExperimentID = st.text_input('Experiment ID', value=f'Batch_v1')
 
     if st.button('Run Simulation'):
-        # format Temp_Data as xlsx for download
-        FileName = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_ODInit{str(od0_val).replace(".","-")}_ShakeFlask.xlsx'
+        # set uptake rate of selected substrate
+        # st.session_state['host'].metabolism.set_resetCarbonExchanges({myExp.CarbonID: myExp.CarbonConc})
+        # GrowthRate, ExchangeRates = st.session_state['host'].metabolism.optimize_ReportExchanges()
+        # UpRate = -ExchangeRates[myExp.CarbonID]
+        # Yield = round(GrowthRate/UpRate,2) if UpRate != 0 else 0 # gCDW/mmol
+        # # calculate biomass capacity in gCDW/L
+        # BioWeightConc = Yield * myExp.CarbonConc  # gCDW/L
+        # CapacityWeight = BioWeightConc * (myExp.MediumVolume/1000)  # gCDW in the flask
+        # CapacityOD = CapacityWeight / st.session_state['host'].growth.OD2X  # convert gCDW to OD600
+
+        # format Data as xlsx for download
+        myExp.Results = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_{myExp.ExperimentID}.xlsx'
         # run simulation
-        Temp_Data = st.session_state['exp'].measure_TemperatureGrowth(st.session_state['organism'], temp_list, od0_val)
-        # st.success(f'Simulation started with parameters: {SFlask_VarNames["temp"]}={temp_list}, {SFlask_VarNames["rpm"]}={rpm_val}, {SFlask_VarNames["od0"]}={od0_val}, {SFlask_VarNames["glc"]}={glc_val}')
-        with pd.ExcelWriter(FileName, engine='openpyxl') as writer:
-            Temp_Data.value.to_excel(writer, sheet_name='TemperatureGrowth', index=False)
-        # st.markdown(f'Data saved to {FileName}')
+        Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test=False)
+        with pd.ExcelWriter(myExp.Results, engine='openpyxl') as writer:
+            Data.value.to_excel(writer, sheet_name='TemperatureGrowth', index=False)
+        st.markdown(f'Data saved to {myExp.Results}')
         st.download_button(
             label="Download data as Excel",
-            data=open(FileName, 'rb').read(),
-            file_name=os.path.split(FileName)[-1],
+            data=open(myExp.Results, 'rb').read(),
+            file_name=os.path.split(myExp.Results)[-1],
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+        st.session_state['exp'].record_experiment(myExp)
         st.success('Data simulation completed and file is ready for download.')
 else:
     if st.session_state['exp'] is None:
