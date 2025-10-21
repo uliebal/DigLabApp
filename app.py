@@ -50,7 +50,7 @@ if st.sidebar.toggle('Experiment Setup'):
     st.markdown('Select the organism for the experiment and the investment into lab equipment.')
     col1, col2 = st.columns(2)
     with col1:
-        st.session_state['organism'] = st.selectbox('Select Organism', ['E.coli-core', 'E.coli', 'S.cerevisiae', 'B.subtilis'], index=0)
+        st.session_state['organism'] = st.selectbox('Select Organism', ['E.coli-core'], index=0) #, 'E.coli', 'S.cerevisiae', 'B.subtilis'
         # numerical input as number_input, with default value of date with six digits, range 0-100000, step 1
         st.write(f'Default random seed based on date: {st.session_state["date"]}')
         st.session_state['rand_seed'] = st.number_input('Random Seed for Simulation', min_value=0, max_value=999999, value=int(st.session_state['date']), step=1)
@@ -161,8 +161,11 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         myExp.CultivationTime = st.slider('Total Cultivation Time (h)', min_value =1, max_value=48, value=24, step=1)
         # sampling interval in hours
         myExp.SamplingInterval = st.slider('Sampling Interval (h)', min_value=.5, max_value=12.0, value=1.0, step=0.5)
-        myExp.Analytics = st.multiselect('Select Analytics, multiple possible', list(AnalyticsCosts.keys()), default=[list(AnalyticsCosts.keys())[0]])
         myExp.set_SamplingVector()
+        # the users selects the analytics sampling times from the sampling vector
+        myExp.AnalyticSampling = np.array(st.multiselect('Select Sampling Times for Analytics (h)', myExp.SampleVector, default=myExp.SampleVector[-1]))
+        # if not myExp.AnalyticSampling:
+        #     st.warning('Please select at least one sampling time for analytics.')
 
     with col2:
         # text input to narrow down to specific carbon source
@@ -197,6 +200,7 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         sub_val = round(st.number_input(f'Concentration ({Conc_Unit})', min_value=0., max_value=50., value=1., step=.1),2)
         myExp.CarbonConc = round(abs(sub_val * conc_unit_factor),2)
         st.markdown(f'You selected {myExp.CarbonName} with {myExp.CarbonConc} mM.')
+        myExp.Analytics = st.multiselect('Select Analytics, multiple possible', list(AnalyticsCosts.keys()), default=[list(AnalyticsCosts.keys())[0]])
 
         # if st.button('Run FBA'):
         #     # set uptake rate of selected substrate
@@ -254,3 +258,8 @@ if st.sidebar.button('Reset Experiment'):
     st.session_state['ExpInit'] = None
     st.session_state['exp'] = None
     st.sidebar.success('Experiment reset. You can set up a new experiment now.')
+
+# Stop button that resets any background computation
+if st.sidebar.button('Stop Background Computation'):
+    st.session_state['stop'] = True
+    st.sidebar.success('Background computation will stop soon.')
