@@ -17,6 +17,7 @@ from silvio import __version__ as silvio_version
 # read variable names from Variables.py
 from Variables import Budget
 
+
 # # Initialize session state variables
 st.session_state['date'] = pd.to_datetime('today').strftime('%y%m%d')
 if 'ExpInit' not in st.session_state:
@@ -41,7 +42,51 @@ if 'GSMM' not in st.session_state:
 # if 'ModelFile' not in st.session_state:
 #     st.session_state['ModelFile'] = None
 
+######################################################
+######################################################
+# Example Run
+######################################################
+######################################################
+if st.sidebar.button('Example Run'):
+    myExp = ExperimentSettings(Test=True)
+    myExp.set_SamplingVector()
+    st.session_state['exp'] = DigLabSim(161710, Budget, Budget)
+    st.session_state['host'] = st.session_state['exp'].create_host(myExp.HostName)
+    Result = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
+
+    # format Data as xlsx for download
+    myExp.Results = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{myExp.HostName.replace(".","")}.xlsx'
+    # run simulation
+    Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
+    fig_Bio, ax_Bio = Data.make_plot(XName='time (h)', YNames=['biomass (OD600)'])
+    ax_Bio.set_ylabel('Biomass (OD600)')
+    st.pyplot(fig_Bio)
+    fig_HPLC, ax_HPLC = Data.make_3dplot('HPLC', 'time', 'signal')
+    ax_HPLC.set_zlabel('HPLC signal', rotation=90)
+    ax_HPLC.set_box_aspect(None, zoom=0.88)
+    fig_HPLC.set_size_inches(8, 7)
+
+    st.pyplot(fig_HPLC)
+
+    with pd.ExcelWriter(myExp.Results, engine='openpyxl') as writer:
+        Data.value.to_excel(writer, sheet_name='ExampleExperiment', index=False)
+    st.markdown(f'Data saved to {myExp.Results}')
+    st.download_button(
+        label="Download data as Excel",
+        data=open(myExp.Results, 'rb').read(),
+        file_name=os.path.split(myExp.Results)[-1],
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    # st.session_state['exp'].record_experiment(myExp)
+    st.success('Data simulation completed and file is ready for download.')
+
+
+
+######################################################
+######################################################
 # st.title('Experiment Details')
+######################################################
+######################################################
 st.sidebar.title('Experiment Selection')
 
 st.sidebar.subheader('Experiment Setup')
@@ -94,7 +139,7 @@ if st.sidebar.toggle('Experiment Setup'):
 # st.sidebar.subheader("Experiment Details")
 # if st.sidebar.toggle('Show Experiment Details'):
         # information box on the main page on the experiment details
-with st.expander('Experiment Details', expanded=True):
+with st.expander('Experiment Details', expanded=True):     
     if st.session_state['exp'] is not None:
         st.markdown(f'Organism: {st.session_state["organism"]}')
         st.markdown(f'Remaining budget: {st.session_state["exp"].budget} {st.session_state["currency"]}')
@@ -136,10 +181,10 @@ with st.expander('Experiment Details', expanded=True):
 
 st.sidebar.subheader("Experiment Section")
 Experiment_select = st.sidebar.selectbox('Fermentation Type', ['Select', 'Batch'], key='1') #, 'Continuous'
-if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
-    myExp = ExperimentSettings()
+if Experiment_select == 'Batch': # and st.session_state['exp'] is not None:
+    myExp = ExperimentSettings(Test=True)
     myExp.ExperimentType = 'Batch'
-    myExp.HostName = st.session_state['organism']
+    _ = st.session_state['organism'] # myExp.HostName
     st.title('Batch Experiment in Shake Flask')
     st.markdown('For the shake flask experiment, you can set the temperature, shaking speed (rpm), initial optical density (OD600), and glucose concentration in g/L. After setting the parameters, click on "Run Simulation" to start the experiment.')
     # # Display image
@@ -151,19 +196,18 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         # User input for multiple temperatures (integers)
         temp_str = st.text_input('Enter temperatures (comma-separated, e.g. 25,30,37)', value='30')
         try:
-            myExp.Temperature = [int(x.strip()) for x in temp_str.split(',') if x.strip()]
+            _ = [int(x.strip()) for x in temp_str.split(',') if x.strip()] # myExp.Temperature
         except ValueError:
             st.error("Please enter only integer values separated by commas.")
-        # rpm_val = st.number_input(SFlask_VarNames['rpm'], min_value=100, max_value=300, value=200)
-        myExp.InitBiomass = round(st.number_input('Optical density, OD600', min_value=0.0, max_value=0.3, value=0.1), 3) * st.session_state['host'].growth.OD2X  # convert OD600 to gCDW/L       
+        _ = round(st.number_input('Optical density, OD600', min_value=0.0, max_value=0.3, value=0.1), 3) * st.session_state['host'].growth.OD2X  # myExp.InitBiomass convert OD600 to gCDW/L       
         myExp.MediumVolume = st.slider('Culture Volume (mL) of 500 ml max', min_value=10, max_value=500, value=100, step=10)
         # total cultivation time in hours
-        myExp.CultivationTime = st.slider('Total Cultivation Time (h)', min_value =1, max_value=48, value=24, step=1)
+        _ = st.slider('Total Cultivation Time (h)', min_value =1, max_value=48, value=24, step=1) #myExp.CultivationTime
         # sampling interval in hours
-        myExp.SamplingInterval = st.slider('Sampling Interval (h)', min_value=.5, max_value=12.0, value=1.0, step=0.5)
+        _ = st.slider('Sampling Interval (h)', min_value=.5, max_value=12.0, value=1.0, step=0.5) # myExp.SamplingInterval
         myExp.set_SamplingVector()
         # the users selects the analytics sampling times from the sampling vector
-        myExp.AnalyticSampling = np.array(st.multiselect('Select Sampling Times for Analytics (h)', myExp.SampleVector, default=myExp.SampleVector[-1]))
+        _ = np.array(st.multiselect('Select Sampling Times for Analytics (h)', myExp.SampleVector, default=myExp.SampleVector[-1])) # myExp.AnalyticSampling
         # if not myExp.AnalyticSampling:
         #     st.warning('Please select at least one sampling time for analytics.')
 
@@ -183,9 +227,9 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
             if not Exch_Reactions:
                 st.warning(f'No exchange reaction found for "{sub_sel}". Please select another substrate.')
             else:
-                myExp.CarbonID = Exch_Reactions[0].id
-                myExp.CarbonName = sub_sel.name
-                st.markdown(f'Found exchange reaction "{myExp.CarbonID}"')
+                CarbonID = Exch_Reactions[0].id #myExp.CarbonID
+                _ = sub_sel.name #myExp.CarbonName
+                st.markdown(f'Found exchange reaction "{CarbonID}"')
         # selectbox for concentration unit, default g/L, options: g/L, mM, M
         # the number input for concentration is only shown if the concentration unit is selected
         Conc_Unit = st.selectbox('Select Concentration Unit', ['g/L', 'mM', 'M'], index=0)
@@ -198,8 +242,8 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         else:
             conc_unit_factor = 1  # default to g/L if something goes wrong
         sub_val = round(st.number_input(f'Concentration ({Conc_Unit})', min_value=0., max_value=50., value=1., step=.1),2)
-        myExp.CarbonConc = round(abs(sub_val * conc_unit_factor),2)
-        st.markdown(f'You selected {myExp.CarbonName} with {myExp.CarbonConc} mM.')
+        _ = round(abs(sub_val * conc_unit_factor),2) # myExp.CarbonConc
+        # st.markdown(f'You selected {myExp.CarbonName} with {myExp.CarbonConc} mM.')
         myExp.Analytics = st.multiselect('Select Analytics, multiple possible', list(AnalyticsCosts.keys()), default=[list(AnalyticsCosts.keys())[0]])
 
         # if st.button('Run FBA'):
@@ -235,7 +279,7 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
         # format Data as xlsx for download
         myExp.Results = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_{myExp.ExperimentID}.xlsx'
         # run simulation
-        Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test=False)
+        Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
         with pd.ExcelWriter(myExp.Results, engine='openpyxl') as writer:
             Data.value.to_excel(writer, sheet_name='TemperatureGrowth', index=False)
         st.markdown(f'Data saved to {myExp.Results}')
@@ -245,7 +289,7 @@ if Experiment_select == 'Batch' and st.session_state['exp'] is not None:
             file_name=os.path.split(myExp.Results)[-1],
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        st.session_state['exp'].record_experiment(myExp)
+        # st.session_state['exp'].record_experiment(myExp)
         st.success('Data simulation completed and file is ready for download.')
 else:
     if st.session_state['exp'] is None:
