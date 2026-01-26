@@ -8,7 +8,7 @@ import silvio
 from silvio.catalog.StrExpSim import DigLabSim
 from silvio.experiment import ExperimentSettings
 from silvio.extensions.common import myUnits, AnalyticsCosts
-# from silvio.extensions.utils.misc import Download_GSMM
+from silvio.extensions.utils.misc import Help_getTargetExchangeID
 # from silvio.extensions.common import BIGG_dict
 # from silvio.utils import coalesce
 # get silvio version
@@ -55,7 +55,7 @@ if st.sidebar.button('Example Run'):
     Result = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
 
     # format Data as xlsx for download
-    myExp.Results = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{myExp.HostName.replace(".","")}.xlsx'
+    myExp.OutputFilePath = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{myExp.HostName.replace(".","")}.xlsx'
     # run simulation
     Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
     fig_Bio, ax_Bio = Data.make_plot(XName='time (h)', YNames=['biomass (OD600)'])
@@ -68,13 +68,13 @@ if st.sidebar.button('Example Run'):
 
     st.pyplot(fig_HPLC)
 
-    with pd.ExcelWriter(myExp.Results, engine='openpyxl') as writer:
+    with pd.ExcelWriter(myExp.OutputFilePath, engine='openpyxl') as writer:
         Data.value.to_excel(writer, sheet_name='ExampleExperiment', index=False)
-    st.markdown(f'Data saved to {myExp.Results}')
+    st.markdown(f'Data saved to {myExp.OutputFilePath}')
     st.download_button(
         label="Download data as Excel",
-        data=open(myExp.Results, 'rb').read(),
-        file_name=os.path.split(myExp.Results)[-1],
+        data=open(myExp.OutputFilePath, 'rb').read(),
+        file_name=os.path.split(myExp.OutputFilePath)[-1],
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     # st.session_state['exp'].record_experiment(myExp)
@@ -95,7 +95,7 @@ if st.sidebar.toggle('Experiment Setup'):
     st.markdown('Select the organism for the experiment and the investment into lab equipment.')
     col1, col2 = st.columns(2)
     with col1:
-        st.session_state['organism'] = st.selectbox('Select Organism', ['E.coli-core'], index=0) #, 'E.coli', 'S.cerevisiae', 'B.subtilis'
+        st.session_state['organism'] = st.selectbox('Select Organism', ['E.coli-core', 'E.coli'], index=0) #, 'E.coli', 'S.cerevisiae', 'B.subtilis'
         # numerical input as number_input, with default value of date with six digits, range 0-100000, step 1
         st.write(f'Default random seed based on date: {st.session_state["date"]}')
         st.session_state['rand_seed'] = st.number_input('Random Seed for Simulation', min_value=0, max_value=999999, value=int(st.session_state['date']), step=1)
@@ -159,12 +159,12 @@ with st.expander('Experiment Details', expanded=True):
         # only display attributes that are not None
         if option:
             for attr, value in vars(st.session_state['exp'].experiment_history[option]).items():
-                if attr not in ['CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','Results']:#'CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','Results']:  # skip some attributes
+                if attr not in ['CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','OutputFilePath']:#'CarbonID','CarbonUptakeRate','InitBiomass','GrowthRate','Yield','Capacity','SampleVector','OutputFilePath']:  # skip some attributes
                     st.markdown(f'**{attr}**: {value} {myUnits[attr] if attr in myUnits else ""}')
-                # allow downloading the results file
-                if attr == 'Results' and value is not None:
+                # allow downloading the OutputFilePath file
+                if attr == 'OutputFilePath' and value is not None:
                     st.download_button(
-                        label="Download Results File",
+                        label="Download OutputFilePath File",
                         data=open(value, 'rb').read(),
                         file_name=os.path.split(value)[-1],
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -182,9 +182,9 @@ with st.expander('Experiment Details', expanded=True):
 st.sidebar.subheader("Experiment Section")
 Experiment_select = st.sidebar.selectbox('Fermentation Type', ['Select', 'Batch'], key='1') #, 'Continuous'
 if Experiment_select == 'Batch': # and st.session_state['exp'] is not None:
-    myExp = ExperimentSettings(Test=True)
+    myExp = ExperimentSettings(Test=False)
     myExp.ExperimentType = 'Batch'
-    _ = st.session_state['organism'] # myExp.HostName
+    myExp.HostName = st.session_state['organism'] # myExp.HostName
     st.title('Batch Experiment in Shake Flask')
     st.markdown('For the shake flask experiment, you can set the temperature, shaking speed (rpm), initial optical density (OD600), and glucose concentration in g/L. After setting the parameters, click on "Run Simulation" to start the experiment.')
     # # Display image
@@ -194,22 +194,23 @@ if Experiment_select == 'Batch': # and st.session_state['exp'] is not None:
     col1, col2 = st.columns(2)
     with col1:
         # User input for multiple temperatures (integers)
-        temp_str = st.text_input('Enter temperatures (comma-separated, e.g. 25,30,37)', value='30')
-        try:
-            _ = [int(x.strip()) for x in temp_str.split(',') if x.strip()] # myExp.Temperature
-        except ValueError:
-            st.error("Please enter only integer values separated by commas.")
-        _ = round(st.number_input('Optical density, OD600', min_value=0.0, max_value=0.3, value=0.1), 3) * st.session_state['host'].growth.OD2X  # myExp.InitBiomass convert OD600 to gCDW/L       
+        myExp.Temperature = int(st.slider('Choose temperature (°C)', min_value=20, max_value=40, value=30, step=1))
+        # try:
+        #     _ = [int(x.strip()) for x in temp_str.split(',') if x.strip()] # myExp.Temperature
+        # except ValueError:
+        #     st.error("Please enter only integer values separated by commas.")
+        myExp.InitBiomass = round(st.number_input('Optical density, OD600', min_value=0.0, max_value=0.3, value=0.1), 3) * st.session_state['host'].growth.OD2X  # myExp.InitBiomass convert OD600 to gCDW/L
         myExp.MediumVolume = st.slider('Culture Volume (mL) of 500 ml max', min_value=10, max_value=500, value=100, step=10)
         # total cultivation time in hours
-        _ = st.slider('Total Cultivation Time (h)', min_value =1, max_value=48, value=24, step=1) #myExp.CultivationTime
+        myExp.CultivationTime = st.slider('Total Cultivation Time (h)', min_value=1, max_value=48, value=24, step=1)
         # sampling interval in hours
-        _ = st.slider('Sampling Interval (h)', min_value=.5, max_value=12.0, value=1.0, step=0.5) # myExp.SamplingInterval
+        myExp.SamplingInterval = st.slider('Sampling Interval (h)', min_value=.5, max_value=12.0, value=1.0, step=0.5)
         myExp.set_SamplingVector()
         # the users selects the analytics sampling times from the sampling vector
-        _ = np.array(st.multiselect('Select Sampling Times for Analytics (h)', myExp.SampleVector, default=myExp.SampleVector[-1])) # myExp.AnalyticSampling
+        myExp.AnalyticSampling = np.array(st.multiselect('Select Sampling Times for Analytics (h)', myExp.SampleVector, default=myExp.SampleVector[-1])) # myExp.AnalyticSampling
         # if not myExp.AnalyticSampling:
         #     st.warning('Please select at least one sampling time for analytics.')
+        myExp.Analytics = st.multiselect('Select Analytics, multiple possible', list(AnalyticsCosts.keys()), default=[list(AnalyticsCosts.keys())[0]])
 
     with col2:
         # text input to narrow down to specific carbon source
@@ -228,7 +229,7 @@ if Experiment_select == 'Batch': # and st.session_state['exp'] is not None:
                 st.warning(f'No exchange reaction found for "{sub_sel}". Please select another substrate.')
             else:
                 CarbonID = Exch_Reactions[0].id #myExp.CarbonID
-                _ = sub_sel.name #myExp.CarbonName
+                myExp.CarbonName = [CarbonID] # sub_sel.name #myExp.CarbonName
                 st.markdown(f'Found exchange reaction "{CarbonID}"')
         # selectbox for concentration unit, default g/L, options: g/L, mM, M
         # the number input for concentration is only shown if the concentration unit is selected
@@ -242,9 +243,23 @@ if Experiment_select == 'Batch': # and st.session_state['exp'] is not None:
         else:
             conc_unit_factor = 1  # default to g/L if something goes wrong
         sub_val = round(st.number_input(f'Concentration ({Conc_Unit})', min_value=0., max_value=50., value=1., step=.1),2)
-        _ = round(abs(sub_val * conc_unit_factor),2) # myExp.CarbonConc
+        myExp.CarbonSubConc = {myExp.CarbonName[0]: round(abs(sub_val * conc_unit_factor),2)} # myExp.CarbonConc
         # st.markdown(f'You selected {myExp.CarbonName} with {myExp.CarbonConc} mM.')
-        myExp.Analytics = st.multiselect('Select Analytics, multiple possible', list(AnalyticsCosts.keys()), default=[list(AnalyticsCosts.keys())[0]])
+        # Setting CO2 transfer rate by identifying the exchange reaction
+        CTR_Choices = Help_getTargetExchangeID(st.session_state['host'].metabolism.model, 'CO2')
+        myExp.CTR = st.selectbox('Select CO2 Exchange Reaction', CTR_Choices, index=0)
+        # Setting O2 transfer rate by identifying the exchange reaction
+        OTR_Choices = Help_getTargetExchangeID(st.session_state['host'].metabolism.model, 'O2')
+        myExp.OTR = st.selectbox('Select O2 Exchange Reaction', OTR_Choices, index=0)
+        # # find sustrate in exchange reactions
+        # Exch_Reactions = [r for r in model.exchanges if sub_sel.id in r.reaction]
+        # if not Exch_Reactions:
+        #     st.warning(f'No exchange reaction found for "{sub_sel}". Please select another substrate.')
+        # else:
+        #     CarbonID = Exch_Reactions[0].id #myExp.CarbonID
+        #     myExp.CarbonName = [CarbonID] # sub_sel.name #myExp.CarbonName
+        #     st.markdown(f'Found exchange reaction "{CarbonID}"')
+
 
         # if st.button('Run FBA'):
         #     # set uptake rate of selected substrate
@@ -263,7 +278,7 @@ if Experiment_select == 'Batch': # and st.session_state['exp'] is not None:
         #     st.write(st.session_state['host'].metabolism.model_tmp.summary())
 
     # text input for experiment id
-    myExp.ExperimentID = st.text_input('Experiment ID', value=f'Batch_v1')
+    myExp.ExperimentID = st.text_input('Experiment ID', value='Batch_v1')
 
     if st.button('Run Simulation'):
         # set uptake rate of selected substrate
@@ -277,25 +292,89 @@ if Experiment_select == 'Batch': # and st.session_state['exp'] is not None:
         # CapacityOD = CapacityWeight / st.session_state['host'].growth.OD2X  # convert gCDW to OD600
 
         # format Data as xlsx for download
-        myExp.Results = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_{myExp.ExperimentID}.xlsx'
+        myExp.OutputFilePath = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_{myExp.ExperimentID}.xlsx'
+        #export myExp to a txt file
+        with open(f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{st.session_state["organism"].replace(".","")}_{myExp.ExperimentID}_Settings.txt', 'w') as f:
+            for attr, value in vars(myExp).items():
+                f.write(f'{attr}: {value}\n')
+
+############################################################################
+############################################################################
+        # myExp = ExperimentSettings() #Test=True
+        # myExp.ExperimentID = 'Test'
+        # myExp.HostName = 'E.coli-core'
+        # myExp.Temperature = int(32)
+        # myExp.Analytics = ['Biomass']#, 'Carbon-Substrate', 'HPLC'] # , 'Carbon-Substrate','ProductsSol'
+        # myExp.CarbonName = ['EX_glc__D_e']
+        # myExp.CarbonSubConc = {'EX_glc__D_e':5.0}
+        # myExp.CultivationTime = 8.0
+        # myExp.SamplingInterval = 0.5
+        # myExp.AnalyticSampling = 4
+        # myExp.InitBiomass = 0.01
+        # myExp.set_SamplingVector()
+############################################################################
+############################################################################
+
+
         # run simulation
-        Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
-        with pd.ExcelWriter(myExp.Results, engine='openpyxl') as writer:
-            Data.value.to_excel(writer, sheet_name='TemperatureGrowth', index=False)
-        st.markdown(f'Data saved to {myExp.Results}')
+        Data = st.session_state['exp'].measure_TemperatureGrowth(myExp)
+
+        # st.write(myExp)
+
+        # Display OutputFilePath
+        st.write('### Simulation OutputFilePath')
+        st.write(Data.value)
+
+
+        for analytic in myExp.Analytics:
+            if analytic == 'HPLC':
+                fig_Bio, ax_Bio = Data.make_3dplot('HPLC', 'time', 'signal') 
+                ax_Bio.set_ylabel('Sample time')
+                st.pyplot(fig_Bio)
+            elif analytic == 'Metabolites':
+                fig_mets, ax_mets = Data.make_plot(XName='time (h)', YNames=[f'{met} conc. (mM)' for met in myExp.CarbonConcDynamic.keys()])
+                st.pyplot(fig_mets)
+            elif analytic == 'GTR':
+                fig_GTR, ax_GTR = Data.make_plot(XName='time (h)', YNames=['OTR (mM/h)', 'CTR (mM/h)'])
+                ax_GTR.set_ylabel('Rate (mM/h)')
+                st.pyplot(fig_GTR)
+            else:
+                fig_Bio, ax_Bio = Data.make_plot(XName='time (h)', YNames=[analytic])
+                st.pyplot(fig_Bio)
+
+
+        with pd.ExcelWriter(myExp.OutputFilePath, engine='openpyxl') as writer:
+            Data.value.to_excel(writer, sheet_name=myExp.ExperimentID, index=False)
+        st.markdown(f'Data saved to {myExp.OutputFilePath}')
         st.download_button(
             label="Download data as Excel",
-            data=open(myExp.Results, 'rb').read(),
-            file_name=os.path.split(myExp.Results)[-1],
+            data=open(myExp.OutputFilePath, 'rb').read(),
+            file_name=os.path.split(myExp.OutputFilePath)[-1],
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         # st.session_state['exp'].record_experiment(myExp)
         st.success('Data simulation completed and file is ready for download.')
+
 else:
     if st.session_state['exp'] is None:
         st.warning('Please initialize the experiment first.')
     else:
         st.info('Select "Shake Flask" from the dropdown to set parameters and run the simulation.')
+
+if st.sidebar.toggle('Organism Details'):
+    if st.session_state['host'] is not None:
+        st.sidebar.markdown(f'### Organism: {st.session_state["organism"]}')
+        st.sidebar.markdown(f'Model ID: {st.session_state["host"].metabolism.model.id}')
+        # st.sidebar.markdown(f'# reactions: {len(st.session_state["host"].metabolism.model.reactions)}')
+        # st.sidebar.markdown(f'# metabolites: {len(st.session_state["host"].metabolism.model.metabolites)}')
+        # st.sidebar.markdown(f'# genes: {len(st.session_state["host"].metabolism.model.genes)}')
+        # show optimal growth temperature
+        st.sidebar.markdown(f'Opt. Temp.: {st.session_state["host"].opt_growth_temp} °C')
+        st.sidebar.markdown(f'OD2DW factor: {st.session_state["host"].growth.OD2X} gCDW/OD600')
+        st.sidebar.markdown(f'Vmax, Km, KI: {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).Vmax}, {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).Km}, {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).KI}')
+    else:
+        st.sidebar.info('Experiment not initialized yet.')
+
 
 st.sidebar.subheader("Reset Experiment")
 if st.sidebar.button('Reset Experiment'):

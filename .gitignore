@@ -1,5 +1,6 @@
 # the content of Data folder should not be tracked by git
 Data/*.xlsx
+Data/*.txt
 
 # Tutorial for Streamlit applications
 streamlit-sentiment-dashboard
