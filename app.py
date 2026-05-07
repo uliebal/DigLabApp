@@ -47,38 +47,38 @@ if 'GSMM' not in st.session_state:
 # Example Run
 ######################################################
 ######################################################
-if st.sidebar.button('Example Run'):
-    myExp = ExperimentSettings(Test=True)
-    myExp.set_SamplingVector()
-    st.session_state['exp'] = DigLabSim(161710, Budget, Budget)
-    st.session_state['host'] = st.session_state['exp'].create_host(myExp.HostName)
-    Result = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
+# if st.sidebar.button('Example Run'):
+#     myExp = ExperimentSettings(Test=True)
+#     myExp.set_SamplingVector()
+#     st.session_state['exp'] = DigLabSim(161710, Budget, Budget)
+#     st.session_state['host'] = st.session_state['exp'].create_host(myExp.HostName)
+#     Result = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
 
-    # format Data as xlsx for download
-    myExp.OutputFilePath = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{myExp.HostName.replace(".","")}.xlsx'
-    # run simulation
-    Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
-    fig_Bio, ax_Bio = Data.make_plot(XName='time (h)', YNames=['biomass (OD600)'])
-    ax_Bio.set_ylabel('Biomass (OD600)')
-    st.pyplot(fig_Bio)
-    fig_HPLC, ax_HPLC = Data.make_3dplot('HPLC', 'time', 'signal')
-    ax_HPLC.set_zlabel('HPLC signal', rotation=90)
-    ax_HPLC.set_box_aspect(None, zoom=0.88)
-    fig_HPLC.set_size_inches(8, 7)
+#     # format Data as xlsx for download
+#     myExp.OutputFilePath = f'Data/{pd.to_datetime("today").strftime("%y%m%d")}_{myExp.HostName.replace(".","")}.xlsx'
+#     # run simulation
+#     Data = st.session_state['exp'].measure_TemperatureGrowth(myExp, Test='Example')
+#     fig_Bio, ax_Bio = Data.make_plot(XName='time (h)', YNames=['biomass (OD600)'])
+#     ax_Bio.set_ylabel('Biomass (OD600)')
+#     st.pyplot(fig_Bio)
+#     fig_HPLC, ax_HPLC = Data.make_3dplot('HPLC', 'time', 'signal')
+#     ax_HPLC.set_zlabel('HPLC signal', rotation=90)
+#     ax_HPLC.set_box_aspect(None, zoom=0.88)
+#     fig_HPLC.set_size_inches(8, 7)
 
-    st.pyplot(fig_HPLC)
+#     st.pyplot(fig_HPLC)
 
-    with pd.ExcelWriter(myExp.OutputFilePath, engine='openpyxl') as writer:
-        Data.value.to_excel(writer, sheet_name='ExampleExperiment', index=False)
-    st.markdown(f'Data saved to {myExp.OutputFilePath}')
-    st.download_button(
-        label="Download data as Excel",
-        data=open(myExp.OutputFilePath, 'rb').read(),
-        file_name=os.path.split(myExp.OutputFilePath)[-1],
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    # st.session_state['exp'].record_experiment(myExp)
-    st.success('Data simulation completed and file is ready for download.')
+#     with pd.ExcelWriter(myExp.OutputFilePath, engine='openpyxl') as writer:
+#         Data.value.to_excel(writer, sheet_name='ExampleExperiment', index=False)
+#     st.markdown(f'Data saved to {myExp.OutputFilePath}')
+#     st.download_button(
+#         label="Download data as Excel",
+#         data=open(myExp.OutputFilePath, 'rb').read(),
+#         file_name=os.path.split(myExp.OutputFilePath)[-1],
+#         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+#     )
+#     # st.session_state['exp'].record_experiment(myExp)
+#     st.success('Data simulation completed and file is ready for download.')
 
 
 
