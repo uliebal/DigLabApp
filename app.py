@@ -362,18 +362,21 @@ else:
         st.info('Select "Shake Flask" from the dropdown to set parameters and run the simulation.')
 
 if st.sidebar.toggle('Organism Details'):
-    if st.session_state['host'] is not None:
-        st.sidebar.markdown(f'### Organism: {st.session_state["organism"]}')
-        st.sidebar.markdown(f'Model ID: {st.session_state["host"].metabolism.model.id}')
-        # st.sidebar.markdown(f'# reactions: {len(st.session_state["host"].metabolism.model.reactions)}')
-        # st.sidebar.markdown(f'# metabolites: {len(st.session_state["host"].metabolism.model.metabolites)}')
-        # st.sidebar.markdown(f'# genes: {len(st.session_state["host"].metabolism.model.genes)}')
-        # show optimal growth temperature
-        st.sidebar.markdown(f'Opt. Temp.: {st.session_state["host"].opt_growth_temp} °C')
-        st.sidebar.markdown(f'OD2DW factor: {st.session_state["host"].growth.OD2X} gCDW/OD600')
-        st.sidebar.markdown(f'Vmax, Km, KI: {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).Vmax}, {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).Km}, {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).KI}')
+    if int(st.sidebar.number_input('Password', value=None)) == 150981:  # Replace 1234 with your actual password
+        if st.session_state['host'] is not None:
+            st.sidebar.markdown(f'### Organism: {st.session_state["organism"]}')
+            st.sidebar.markdown(f'Model ID: {st.session_state["host"].metabolism.model.id}')
+            # st.sidebar.markdown(f'# reactions: {len(st.session_state["host"].metabolism.model.reactions)}')
+            # st.sidebar.markdown(f'# metabolites: {len(st.session_state["host"].metabolism.model.metabolites)}')
+            # st.sidebar.markdown(f'# genes: {len(st.session_state["host"].metabolism.model.genes)}')
+            # show optimal growth temperature
+            st.sidebar.markdown(f'Opt. Temp.: {st.session_state["host"].opt_growth_temp} °C')
+            st.sidebar.markdown(f'OD2DW factor: {st.session_state["host"].growth.OD2X} gCDW/OD600')
+            st.sidebar.markdown(f'Vmax, Km, KI: {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).Vmax}, {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).Km}, {st.session_state["host"].metabolism.model.reactions.get_by_id(myExp.CarbonName[0]).KI}')
+        else:
+            st.sidebar.info('Experiment not initialized yet.')
     else:
-        st.sidebar.info('Experiment not initialized yet.')
+        st.sidebar.error('Incorrect password.')
 
 
 st.sidebar.subheader("Reset Experiment")
